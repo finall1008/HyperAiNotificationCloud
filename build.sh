@@ -8,6 +8,12 @@ ANDROID_JAR="$SDK_DIR/platforms/android-34/android.jar"
 LIBXPOSED_JAR="$PROJECT_DIR/libs/libxposed-api-102.jar"
 BUILD_DIR="$PROJECT_DIR/build"
 DIST_DIR="$PROJECT_DIR/dist"
+VERSION="$(sed -n 's/.*android:versionName="\([^"]*\)".*/\1/p' "$PROJECT_DIR/AndroidManifest.xml")"
+APK_NAME="HyperAiNotificationCloud-API102-v${VERSION}"
+if [[ "${GITHUB_REF:-}" == refs/tags/* && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+    echo "Release tag must match AndroidManifest.xml version: v$VERSION" >&2
+    exit 1
+fi
 
 rm -rf "$BUILD_DIR" "$DIST_DIR"
 mkdir -p "$BUILD_DIR/gen" "$BUILD_DIR/classes" "$BUILD_DIR/dex" "$DIST_DIR"
@@ -50,27 +56,35 @@ cp "$BUILD_DIR/dex/classes.dex" "$BUILD_DIR/classes.dex"
 
 echo "[5/5] Zipaligning and signing APK..."
 "$BUILD_TOOLS/zipalign" -f -p 4 "$BUILD_DIR/unsigned.unaligned.apk" "$BUILD_DIR/aligned.apk"
-"$BUILD_TOOLS/apksigner" sign \
-    --ks "$HOME/.android/debug.keystore" \
-    --ks-pass pass:android \
-    --key-pass pass:android \
-    --out "$DIST_DIR/HyperAiNotificationCloud-API102-v1.0.0.apk" \
-    "$BUILD_DIR/aligned.apk"
-
 if [ -n "${RELEASE_KEYSTORE:-}" ]; then
+    if [ -z "${HYPERAI_SIGNING_PASSWORD:-}" ]; then
+        HYPERAI_SIGNING_PASSWORD="$(/usr/bin/security find-generic-password \
+            -s "${RELEASE_KEYCHAIN_SERVICE:-hyper-ai-third-party-mcp.release-keystore}" \
+            -a "$USER" -w)"
+    fi
     export HYPERAI_SIGNING_PASSWORD
-    HYPERAI_SIGNING_PASSWORD="$(/usr/bin/security find-generic-password -s "${RELEASE_KEYCHAIN_SERVICE:-hyper-ai-third-party-mcp.release-keystore}" -a "$USER" -w)"
     trap 'unset HYPERAI_SIGNING_PASSWORD' EXIT
+    APK="$DIST_DIR/$APK_NAME-release.apk"
     "$BUILD_TOOLS/apksigner" sign \
         --ks "$RELEASE_KEYSTORE" \
         --ks-key-alias "${RELEASE_KEY_ALIAS:-finall}" \
         --ks-pass env:HYPERAI_SIGNING_PASSWORD \
         --key-pass env:HYPERAI_SIGNING_PASSWORD \
-        --out "$DIST_DIR/HyperAiNotificationCloud-API102-v1.0.0-release.apk" \
-        "$BUILD_DIR/aligned.apk"
+        --out "$APK" "$BUILD_DIR/aligned.apk"
     unset HYPERAI_SIGNING_PASSWORD
-    echo "Release APK signed: $DIST_DIR/HyperAiNotificationCloud-API102-v1.0.0-release.apk"
+else
+    DEBUG_KEYSTORE="$HOME/.android/debug.keystore"
+    if [ ! -f "$DEBUG_KEYSTORE" ]; then
+        mkdir -p "$(dirname "$DEBUG_KEYSTORE")"
+        keytool -genkeypair -keystore "$DEBUG_KEYSTORE" -storepass android \
+            -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA -keysize 2048 -validity 10000
+    fi
+    APK="$DIST_DIR/$APK_NAME.apk"
+    "$BUILD_TOOLS/apksigner" sign --ks "$DEBUG_KEYSTORE" \
+        --ks-pass pass:android --key-pass pass:android \
+        --out "$APK" "$BUILD_DIR/aligned.apk"
 fi
 
-echo "Build complete: $DIST_DIR/HyperAiNotificationCloud-API102-v1.0.0.apk"
-unzip -l "$DIST_DIR/HyperAiNotificationCloud-API102-v1.0.0.apk"
+"$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+echo "Build complete: $APK"

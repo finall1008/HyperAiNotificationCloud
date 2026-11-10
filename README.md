@@ -24,9 +24,17 @@
 ./build.sh
 ```
 
-调试 APK 输出到 `dist/`，中间产物位于 `build/`。源码路径由脚本自动识别。
+APK 输出到 `dist/`，中间产物位于 `build/`。源码路径和 APK 版本号由脚本自动识别。
 
-macOS 正式签名使用外部 keystore，密码从钥匙串读取。指定 `RELEASE_KEYSTORE` 后同时输出正式 APK；`RELEASE_KEY_ALIAS` 默认 `finall`，`RELEASE_KEYCHAIN_SERVICE` 默认 `hyper-ai-third-party-mcp.release-keystore`，钥匙串账户使用当前系统用户。
+正式签名使用外部 keystore：指定 `RELEASE_KEYSTORE` 后输出正式 APK，未指定时输出调试 APK。`RELEASE_KEY_ALIAS` 默认 `finall`。CI 通过环境变量 `HYPERAI_SIGNING_PASSWORD` 提供签名密码；macOS 本地构建从钥匙串读取，`RELEASE_KEYCHAIN_SERVICE` 默认 `hyper-ai-third-party-mcp.release-keystore`，钥匙串账户使用当前系统用户。
+
+## GitHub Release
+
+仓库 Secrets 保存 `RELEASE_JKS_BASE64`（正式 keystore 的 Base64 编码）与 `RELEASE_STORE_PASSWORD`（签名密码）。工作流只将 keystore 解码到 runner 的临时目录，构建完成后清理。
+
+推送与 `AndroidManifest.xml` 中版本号一致的 `v` 前缀标签，例如 `v1.0.0`，会自动构建、核对正式签名证书，并发布包含 APK 和 SHA-256 校验文件的 GitHub Release。更新版本时同时递增 `versionCode`，以支持覆盖安装。
+
+也可在 Actions 中手动运行 Release 工作流：选择版本标签时发布 Release，选择分支时仅生成构建制品。
 
 ## 代码
 
