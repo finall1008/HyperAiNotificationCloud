@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">澎湃通知 AI 云端摘要</string>
+    <string name="description">接管澎湃 OS 4 原生「通知列表总结」，免端侧模型，使用自定义云端大模型 API (OpenAI 兼容) 实时生成通知摘要。</string>
+</resources>
