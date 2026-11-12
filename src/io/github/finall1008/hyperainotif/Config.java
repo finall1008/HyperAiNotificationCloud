@@ -17,6 +17,7 @@ public final class Config {
     public static final String ACTION_CONFIG_CHANGED = "io.github.finall1008.hyperainotif.CONFIG_CHANGED";
     public static final String KEY_ALL_APPS = "all_apps";
     public static final String KEY_MIN_LENGTH = "min_length";
+    public static final String KEY_GROUP_SUMMARY = "group_summary";
 
     public static final String DEFAULT_API_URL = "https://opencode.ai/zen/go/v1/chat/completions";
     public static final String DEFAULT_API_KEY = "";

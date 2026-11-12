@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
     private EditText etNotificationThreshold;
     private EditText etWaitSeconds;
     private CheckBox cbAllApps;
+    private CheckBox cbGroupSummary;
     private TextView tvStatus;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -74,7 +75,7 @@ public class MainActivity extends Activity {
         headerCard.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("在 LSPosed 中勾选「系统框架 (android)」、「通知管理服务 (com.miui.notification)」与「设置 (com.android.settings)」后生效。");
+        subtitle.setText("在 LSPosed 中勾选「系统框架 (android)」、「系统界面 (com.android.systemui)」、「通知管理服务 (com.miui.notification)」与「设置 (com.android.settings)」后生效。");
         subtitle.setTextSize(13);
         subtitle.setTextColor(Color.parseColor("#666666"));
         subtitle.setPadding(0, dp(6), 0, 0);
@@ -118,6 +119,13 @@ public class MainActivity extends Activity {
         cbScreenOn.setChecked(prefs.getBoolean(Config.KEY_SUMMARIZE_SCREEN_ON,
                 Config.DEFAULT_SUMMARIZE_SCREEN_ON));
         ruleCard.addView(cbScreenOn);
+
+        cbGroupSummary = new CheckBox(this);
+        cbGroupSummary.setText("收拢通知综合摘要（收拢时合并显示，展开后查看各条通知）");
+        cbGroupSummary.setTextSize(14);
+        cbGroupSummary.setTextColor(Color.parseColor("#222222"));
+        cbGroupSummary.setChecked(prefs.getBoolean(Config.KEY_GROUP_SUMMARY, true));
+        ruleCard.addView(cbGroupSummary);
 
         addLabel(ruleCard, "通知数量阈值（待总结通知达到此数量后开始等待，至少 1 条）");
         etNotificationThreshold = createInput(String.valueOf(prefs.getInt(
@@ -194,6 +202,7 @@ public class MainActivity extends Activity {
                 .putString(Config.KEY_MODEL, etModel.getText().toString().trim())
                 .putString(Config.KEY_SYSTEM_PROMPT, etPrompt.getText().toString().trim())
                 .putBoolean(Config.KEY_SUMMARIZE_SCREEN_ON, cbScreenOn.isChecked())
+                .putBoolean(Config.KEY_GROUP_SUMMARY, cbGroupSummary.isChecked())
                 .putInt(Config.KEY_NOTIFICATION_THRESHOLD, threshold)
                 .putInt(Config.KEY_WAIT_SECONDS, waitSeconds)
                 .putBoolean(Config.KEY_ALL_APPS, cbAllApps.isChecked())

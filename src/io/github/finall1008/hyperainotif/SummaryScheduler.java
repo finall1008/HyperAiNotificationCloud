@@ -56,7 +56,7 @@ final class SummaryScheduler extends BroadcastReceiver implements AlarmManager.O
                 Config.DEFAULT_WAIT_SECONDS)) * 1000L;
 
         alarms.cancel(this);
-        if ((!screenOn && power.isInteractive()) || pendingCount.getAsInt() < threshold) {
+        if (pendingCount.getAsInt() < threshold || (!screenOn && power.isInteractive())) {
             readySince = -1;
             return;
         }

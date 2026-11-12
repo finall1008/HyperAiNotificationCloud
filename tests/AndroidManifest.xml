@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.finall1008.hyperainotif.tests">
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
+    <application android:label="HyperAI integration tests" />
+    <instrumentation
+        android:name="io.github.finall1008.hyperainotif.GroupSummaryTests"
+        android:targetPackage="io.github.finall1008.hyperainotif" />
+</manifest>
