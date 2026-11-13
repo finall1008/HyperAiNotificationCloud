@@ -40,7 +40,7 @@ final class NotificationSummaries {
     private final Method setOutput;
     private final Method applySummary;
     private final Map<?, ?> allowedPackages;
-    private final Supplier<Bundle> config;
+    private final AsyncConfig config;
     private final Map<String, String> attempted = new HashMap<>();
     private final Map<String, String> submittedItems = new HashMap<>();
     private final Set<String> inFlight = new HashSet<>();
@@ -53,7 +53,6 @@ final class NotificationSummaries {
         this.context = context;
         this.service = service;
         this.hyperService = hyperService;
-        this.config = config;
         Class<?> nms = service.getClass();
         Class<?> record = loader.loadClass("com.android.server.notification.NotificationRecord");
         Class<?> ai = loader.loadClass("com.android.server.notification.HyperAINotification");
@@ -70,13 +69,20 @@ final class NotificationSummaries {
         applySummary = ModuleMain.findMethod(hyper, "copeNotificationLocked", ai);
         allowedPackages = (Map<?, ?>) ModuleMain.findField(hyper,
                 "mAllowAINotificaitonPackagers").get(null);
-        scheduler = new SummaryScheduler(context, handler, config, this::dispatch, this::pendingCount);
-        reconcile = scheduler::refresh;
+        this.config = new AsyncConfig(handler, Executors.newSingleThreadExecutor(), config,
+                () -> schedulerRefresh());
+        scheduler = new SummaryScheduler(context, handler, this.config, this::dispatch, this::pendingCount);
+        reconcile = this.config::refresh;
         android.content.IntentFilter filter = new android.content.IntentFilter();
         filter.addAction(android.content.Intent.ACTION_SCREEN_ON);
         filter.addAction(android.content.Intent.ACTION_SCREEN_OFF);
         filter.addAction(Config.ACTION_CONFIG_CHANGED);
-        context.registerReceiver(scheduler, filter, null, handler, Context.RECEIVER_EXPORTED);
+        context.registerReceiver(new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, android.content.Intent intent) {
+                refresh();
+            }
+        }, filter, null, handler, Context.RECEIVER_EXPORTED);
         refresh();
     }
 
@@ -86,8 +92,11 @@ final class NotificationSummaries {
     }
 
     private Bundle settings() {
-        Bundle value = config.get();
-        return value == null ? new Bundle() : value;
+        return config.get();
+    }
+
+    private void schedulerRefresh() {
+        scheduler.refresh();
     }
 
     private List<Batch> collect(Bundle settings) throws Exception {

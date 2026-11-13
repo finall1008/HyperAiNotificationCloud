@@ -87,6 +87,7 @@ public final class GroupSummaryTests extends Instrumentation {
         try (Fixture server = new Fixture()) {
             fixture = server;
             dataTests();
+            asyncConfigTests();
             preferences.edit().putString(Config.KEY_API_URL, server.url())
                     .putString(Config.KEY_API_KEY, "local-fixture")
                     .putString(Config.KEY_MODEL, "fixture")
@@ -124,6 +125,51 @@ public final class GroupSummaryTests extends Instrumentation {
             changed();
         }
         finish(code, result);
+    }
+
+    private void asyncConfigTests() throws Exception {
+        android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+        java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch heartbeat = new CountDownLatch(1);
+        CountDownLatch updated = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger queries = new java.util.concurrent.atomic.AtomicInteger();
+        AsyncConfig config = new AsyncConfig(main, worker, () -> {
+            int call = queries.incrementAndGet();
+            if (call == 1) {
+                entered.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            Bundle value = new Bundle();
+            value.putInt("generation", call);
+            return value;
+        }, updated::countDown);
+        try {
+            main.post(config::refresh);
+            check(entered.await(2, TimeUnit.SECONDS), "configuration query starts on worker");
+            main.post(() -> {
+                for (int i = 0; i < 20; i++) config.refresh();
+                if (config.get().getInt("generation", 0) == 0) heartbeat.countDown();
+            });
+            check(heartbeat.await(1, TimeUnit.SECONDS), "main handler and cached reads stay responsive while provider is blocked");
+            check(queries.get() == 1, "blocked configuration refreshes are coalesced");
+            release.countDown();
+            check(updated.await(3, TimeUnit.SECONDS), "configuration refresh completes after provider resumes");
+            CountDownLatch latest = new CountDownLatch(1);
+            main.post(() -> {
+                if (config.get().getInt("generation") == 2) latest.countDown();
+            });
+            check(latest.await(1, TimeUnit.SECONDS) && queries.get() == 2,
+                    "configuration changed during query is reloaded before scheduling");
+        } finally {
+            release.countDown();
+            worker.shutdownNow();
+        }
     }
 
     private void dataTests() throws Exception {
